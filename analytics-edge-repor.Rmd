@@ -1,0 +1,207 @@
+---
+title: "analytics-edge report"
+author: "Vivek Kalyan"
+date: "8/13/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## Report
+
+In the Kaggle competition, we had employed the use of the random forest model to make our predictions. Random forests is a machine learning method for classification and regression. It can be built multiple decision trees and merges them together to get a more accurate and stable prediction. Random forest also add randomness to the model while it is growing the trees. Instead of searching the most important feature while splitting a node, it searches for the best features among a random subset of features which results in a wide diversity  that generally results a better model. Therefore, only a random subset of feature is considered in the algorithm when splitting a node. 
+
+```{r data}
+setwd("~/Documents/analytics-edge")
+real_train=read.csv("train.csv")
+real_test=read.csv("test.csv") 
+
+all=rbind(real_train,real_test)
+```
+
+We start the model by starting with preprocessing. We convert the **ordered** variables into numerical values by taking the average of the values. It opens up more options for us in terms of trying our regression methods. Due to the scale of the report, not all of these attempts are shown in this report.
+
+```{r pre-process}
+# miles
+all$miles=ifelse(all$miles=="101 To 150 Miles",125,all$miles)
+all$miles=ifelse(all$miles=="151 To 200 Miles",175,all$miles)
+all$miles=ifelse(all$miles=="201 To 250 Miles",225,all$miles)
+all$miles=ifelse(all$miles=="251 To 300 Miles",275,all$miles)
+all$miles=ifelse(all$miles=="301 To 350 Miles",325,all$miles)
+all$miles=ifelse(all$miles=="351 To 400 Miles",375,all$miles)
+all$miles=ifelse(all$miles=="51 To 100 Miles",75,all$miles)
+all$miles=ifelse(all$miles=="Over 400 Miles",425,all$miles)
+all$miles=ifelse(all$miles=="Under 50 Miles",25,all$miles)
+# night
+all$night=ifelse(all$night=="10% To 20%",0.15,all$night)
+all$night=ifelse(all$night=="21% To 30%",0.25,all$night)
+all$night=ifelse(all$night=="31% To 40%",0.35,all$night)
+all$night=ifelse(all$night=="41% To 50%",0.45,all$night)
+all$night=ifelse(all$night=="51% To 60%",0.55,all$night)
+all$night=ifelse(all$night=="61% To 70%",0.65,all$night)
+all$night=ifelse(all$night=="71% To 80%",0.75,all$night)
+all$night=ifelse(all$night=="81% To 90%",0.85,all$night)
+all$night=ifelse(all$night=="91% To 100%",0.95,all$night)
+all$night=ifelse(all$night=="Under 10%",0.05,all$night)
+# age
+all$age=ifelse(all$age=="30 To 39",35,all$age)
+all$age=ifelse(all$age=="40 To 49",45,all$age)
+all$age=ifelse(all$age=="50 To 59",55,all$age)
+all$age=ifelse(all$age=="60 & Over",65,all$age)
+all$age=ifelse(all$age=="Under 30",25,all$age)
+# income
+all$income=ifelse(all$income=="$100,000 to $109,999",105000,all$income)
+all$income=ifelse(all$income=="$110,000 to $119,999",115000,all$income)
+all$income=ifelse(all$income=="$120,000 to $129,999",125000,all$income)
+all$income=ifelse(all$income=="$130,000 to $139,999",135000,all$income)
+all$income=ifelse(all$income=="$140,000 to $149,999",145000,all$income)
+all$income=ifelse(all$income=="$150,000 to $159,999",155000,all$income)
+all$income=ifelse(all$income=="$160,000 to $169,999",165000,all$income)
+all$income=ifelse(all$income=="$170,000 to $179,999",175000,all$income)
+all$income=ifelse(all$income=="$190,000 to $199,999",195000,all$income)
+all$income=ifelse(all$income=="$200,000 to $209,999",205000,all$income)
+all$income=ifelse(all$income=="$220,000 to $229,999",225000,all$income)
+all$income=ifelse(all$income=="$250,000 to $259,999",255000,all$income)
+all$income=ifelse(all$income=="$270,000 to $279,999",275000,all$income)
+all$income=ifelse(all$income=="$290,000 to $299,999",295000,all$income)
+all$income=ifelse(all$income=="$30,000 to $39,999",35000,all$income)
+all$income=ifelse(all$income=="$300,000 & Over",305000,all$income)
+all$income=ifelse(all$income=="$40,000 to $49,999",45000,all$income)
+all$income=ifelse(all$income=="$50,000 to $59,999",55000,all$income)
+all$income=ifelse(all$income=="$60,000 to $69,999",65000,all$income)
+all$income=ifelse(all$income=="$70,000 to $79,999",75000,all$income)
+all$income=ifelse(all$income=="$80,000 to $89,999",85000,all$income)
+all$income=ifelse(all$income=="$90,000 to $99,999",95000,all$income)
+all$income=ifelse(all$income=="Under $29,999",15000,all$income)
+# ppark
+all$ppark=ifelse(all$ppark=="Daily",1,all$ppark)
+all$ppark=ifelse(all$ppark=="Monthly",0.0333333333333333,all$ppark)
+all$ppark=ifelse(all$ppark=="Never",0,all$ppark)
+all$ppark=ifelse(all$ppark=="Weekly",0.142857142857143,all$ppark)
+all$ppark=ifelse(all$ppark=="Yearly",0.00273972602739726,all$ppark)
+```
+
+
+We then convert variables with categorical values into categorical variables with corresponding names.
+```{r categorical}
+all=cbind(all,sapply(levels(all$segment),function(x) as.integer(x==all$segment))   )
+all=cbind(all,sapply(levels(all$gender),function(x) as.integer(x==all$gender))   )
+all=cbind(all,sapply(levels(all$educ),function(x) as.integer(x==all$educ))   )
+all=cbind(all,sapply(levels(all$region),function(x) as.integer(x==all$region))  )
+all=cbind(all,sapply(levels(all$Urb),function(x) as.integer(x==all$Urb))  )
+```
+
+We then normalize all features so that the mean and variance are consistent for all values
+```{r feature-scaling}
+all$"Full-size Pickup"=scale(all$"Full-size Pickup")
+all$"Midsize Car"=scale(all$"Midsize Car")
+all$"Midsize Luxury Utility segements"=scale(all$"Midsize Luxury Utility segements")
+all$"Midsize Utility"=scale(all$"Midsize Utility")
+all$"Prestige Luxury Sedan"=scale(all$"Prestige Luxury Sedan")
+all$"Small Car"=scale(all$"Small Car")
+all$year=scale(all$year)
+all$miles=scale(all$miles)
+all$night=scale(all$night)
+all$Female=scale(all$Female)
+all$Male=scale(all$Male)
+all$age=scale(all$age)
+all$"College Graduate (4 Years)"=scale(all$"College Graduate (4 Years)")
+all$"Grade School"=scale(all$"Grade School")
+all$"High School"=scale(all$"High School")
+all$"Postgraduate College"=scale(all$"Postgraduate College")
+all$"Some College (1-3 Years)"=scale(all$"Some College (1-3 Years)")
+all$"Trade/Vocational School"=scale(all$"Trade/Vocational School")
+all$MW=scale(all$MW)
+all$NE=scale(all$NE)
+all$SE=scale(all$SE)
+all$SW=scale(all$SW)
+all$W=scale(all$W)
+all$income=scale(all$income)
+all$ppark=scale(all$ppark)
+all$"Rural/Country"=scale(all$"Rural/Country")
+all$"Suburban"=scale(all$"Suburban")
+all$"Urban/City"=scale(all$"Urban/City")
+```
+
+Then, we convert those names into valid names for inputting into models (i.e. converting white space into `.` etc. For example "Foo Bar" into "Foo.Bar")
+```{r}
+names(all) <- make.names(names(all))
+```
+
+
+Now we can finally split our data into train, validation, and test sets 
+```{r resplitting}
+real_train=subset(all,all$Case<751)
+real_test=subset(all,all$Case>=751)
+library('caTools')
+set.seed(1)
+spl = sample.split(real_train, SplitRatio = .7)
+train = subset(real_train, spl == TRUE)
+val = subset(real_train, spl == FALSE)
+```
+
+We also created 2 methods to support our assessment of different models
+```{r ultility-functions}
+convertToCategorical <- function(set) {
+    choices = as.matrix(set[,c("Ch1", "Ch2", "Ch3", "Ch4")])
+    choiceFactor = factor((choices %*% (1:ncol(choices))) + 1, labels = c(colnames(choices)))
+    categoricalSet = set
+    categoricalSet$Ch1 = NULL
+    categoricalSet$Ch2 = NULL
+    categoricalSet$Ch3 = NULL
+    categoricalSet$Ch4 = NULL
+    categoricalSet$Ch = choiceFactor
+    return(categoricalSet)
+}
+logloss <- function(actual, pred) {
+    lossM <- actual * log(pred)
+    lossM[actual == pred] <- 0
+    lossM[is.nan(as.matrix(lossM))] <- Inf
+    
+    loss = - sum(lossM) / nrow(lossM)
+    
+    return(loss)
+}
+```
+
+To utilize `randomForest`, we first needed to convert the dependent variables into a single categorical variable
+```{r convert-to-categories}
+cateTrain = convertToCategorical(train)
+head(cateTrain)
+```
+
+```{r cross-validation}
+library(caret)
+library(e1071)
+control <- trainControl(method='cv', number=10)
+tunegrid <- expand.grid(.mtry=seq(10,30,5))
+rf_gridsearch <- train(Ch~., data=cateTrain, method='rf', tuneGrid=tunegrid, trControl=control)
+print(rf_gridsearch)
+plot(rf_gridsearch)
+```
+
+Here we create our `randomForest` model on the transformed training data and predict on the validation set
+```{r randomforest-model}
+library('randomForest')
+model = randomForest(Ch ~ ., data = cateTrain, ntree=300, mtry=15, importance=TRUE)
+cateTest = convertToCategorical(val)
+valPred = predict(model, cateTest)
+```
+
+We achieved a decent accuracy on the validation set
+``` {r accuracy}
+predTab = table(cateTest$Ch, valPred)
+sum(diag(predTab)) / nrow(cateTest)
+```
+
+Finally, we train our `randonForest` best model with the whole given training data and then churn out the results for test submission.
+```{r submission}
+cateRealTrain = convertToCategorical(real_train)
+final_model = randomForest(Ch ~ ., data = cateRealTrain, ntree=300, mtry=15, importance=TRUE)
+testPred <- predict(final_model, newdata = real_test, type="prob")
+testPred <- as.data.frame(testPred)
+testPred$No <- real_test$No
+testPred <- testPred[, c(5,1,2,3,4)]
+write.csv(testPred, file="submission.csv", row.names=F)
+```
+
